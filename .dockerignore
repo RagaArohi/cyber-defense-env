@@ -1,0 +1,22 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Virtual environments (NOT the env/ source package)
+.venv/
+venv/
+
+# Dev / local files
+.env
+.git/
+.gitignore
+.dockerignore
+
+# Docs and tests (not needed at runtime)
+tests/
+README.md
+LICENSE
+.env.example
