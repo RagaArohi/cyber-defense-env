@@ -315,3 +315,9 @@ def grade_episode(req: GradeRequest):
     result["steps_taken"] = sess["steps"]
     result["session_id"] = req.session_id
     return result
+def main():
+    import uvicorn
+    uvicorn.run(app, host=cfg.host, port=cfg.port, log_level=cfg.log_level)
+
+if __name__ == "__main__":
+    main()
