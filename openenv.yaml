@@ -40,6 +40,7 @@ tasks:
     difficulty: easy
     max_steps: 30
     success_threshold: 0.70
+    grader: tasks.graders.grade_detect_recon
     description: >
       Identify reconnaissance activity early and respond with monitoring or blocking
       actions before the attack escalates. Keep system health above 0.70.
@@ -49,6 +50,7 @@ tasks:
     difficulty: medium
     max_steps: 40
     success_threshold: 0.60
+    grader: tasks.graders.grade_stop_exploit
     description: >
       Stop the active exploitation before the attacker reaches the persistence stage.
       Use targeted actions and manage your resource budget carefully.
@@ -58,6 +60,7 @@ tasks:
     difficulty: hard
     max_steps: 50
     success_threshold: 0.50
+    grader: tasks.graders.grade_prevent_exfil
     description: >
       Prevent data exfiltration using the right actions at the right time.
       Avoid false positives and maintain system availability.

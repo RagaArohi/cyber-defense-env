@@ -60,40 +60,30 @@ TASK_CATALOG = {
         "id": "detect_recon",
         "name": "Detect Reconnaissance",
         "difficulty": "easy",
-        "description": (
-            "An attacker has started passive reconnaissance. "
-            "Identify the threat early and respond with monitoring or blocking actions "
-            "before the attack escalates. Keep system health above 0.70."
-        ),
+        "description": "...",
         "max_steps": 30,
         "success_threshold": 0.7,
+        "grader": "tasks.graders.grade_detect_recon",
     },
     "stop_exploit": {
         "id": "stop_exploit",
         "name": "Stop Active Exploitation",
         "difficulty": "medium",
-        "description": (
-            "An attacker is actively attempting to exploit a vulnerability. "
-            "Stop the attack before it reaches the persistence stage (stage 3). "
-            "Use targeted actions and manage your resource budget carefully."
-        ),
+        "description": "...",
         "max_steps": 40,
         "success_threshold": 0.6,
+        "grader": "tasks.graders.grade_stop_exploit",
     },
     "prevent_exfil": {
         "id": "prevent_exfil",
         "name": "Prevent Data Exfiltration",
         "difficulty": "hard",
-        "description": (
-            "The attacker has progressed through multiple stages and is attempting "
-            "to exfiltrate data. Prevent data theft using the right actions at the right time. "
-            "Avoid false positives and maintain system availability."
-        ),
+        "description": "...",
         "max_steps": 50,
         "success_threshold": 0.5,
+        "grader": "tasks.graders.grade_prevent_exfil",
     },
 }
-
 ACTION_DESCRIPTIONS = {
     "do_nothing":         "Take no action. Free, but allows attack to progress.",
     "monitor_traffic":    "Monitor network traffic. Cost 0.05. Reduces observation noise by 50%.",
