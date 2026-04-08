@@ -317,99 +317,62 @@ def grade_episode(req: GradeRequest):
     result["session_id"] = req.session_id
     return result
 def main():
-    import uvicorn
-    uvicorn.run(app, host=cfg.host, port=cfg.port, log_level=cfg.log_level)
-
-if __name__ == "__main__":
-    main()
     @app.get("/demo", response_class=HTMLResponse)
 def demo():
-    return """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>🛡️ Cyber Defense Env — Live Demo</title>
-    <style>
-        body { font-family: monospace; background: #0d1117; color: #c9d1d9; padding: 20px; max-width: 800px; margin: auto; }
-        h1 { color: #58a6ff; } h2 { color: #3fb950; }
-        button { background: #238636; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 6px; margin: 4px; font-size: 14px; }
-        button:hover { background: #2ea043; }
-        button.danger { background: #da3633; }
-        pre { background: #161b22; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 12px; border: 1px solid #30363d; }
-        #obs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
-        .obs-item { background:#161b22; padding:8px; border-radius:4px; border:1px solid #30363d; }
-        .bar { height:8px; background:#21262d; border-radius:4px; margin-top:4px; }
-        .bar-fill { height:100%; border-radius:4px; background:#58a6ff; transition: width 0.3s; }
-    </style>
-</head>
+    return """<!DOCTYPE html>
+<html><head><title>Cyber Defense Env</title>
+<style>
+body{font-family:monospace;background:#0d1117;color:#c9d1d9;padding:20px;max-width:800px;margin:auto}
+h1{color:#58a6ff}h2{color:#3fb950}
+button{background:#238636;color:white;border:none;padding:10px 20px;cursor:pointer;border-radius:6px;margin:4px;font-size:14px}
+button:hover{background:#2ea043}
+button.danger{background:#da3633}
+pre{background:#161b22;padding:15px;border-radius:6px;font-size:12px;border:1px solid #30363d}
+#obs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.obs-item{background:#161b22;padding:8px;border-radius:4px;border:1px solid #30363d}
+.bar{height:8px;background:#21262d;border-radius:4px;margin-top:4px}
+.bar-fill{height:100%;border-radius:4px;background:#58a6ff;transition:width 0.3s}
+</style></head>
 <body>
-<h1>🛡️ Adaptive Cyber Defense Environment</h1>
+<h1>Adaptive Cyber Defense Environment</h1>
 <p>Live interactive demo — LLM agent vs multi-stage cyber attack</p>
 <h2>Step 1 — Start Episode</h2>
-<button onclick="resetEnv('detect_recon')">🟢 Easy: Detect Recon</button>
-<button onclick="resetEnv('stop_exploit')">🟡 Medium: Stop Exploit</button>
-<button onclick="resetEnv('prevent_exfil')">🔴 Hard: Prevent Exfil</button>
+<button onclick="resetEnv('detect_recon')">Easy: Detect Recon</button>
+<button onclick="resetEnv('stop_exploit')">Medium: Stop Exploit</button>
+<button onclick="resetEnv('prevent_exfil')">Hard: Prevent Exfil</button>
 <h2>Step 2 — Take Actions</h2>
-<div>
-    <button onclick="takeAction('do_nothing')">😴 Do Nothing</button>
-    <button onclick="takeAction('monitor_traffic')">👁️ Monitor Traffic</button>
-    <button onclick="takeAction('block_ip')">🚫 Block IP</button>
-    <button onclick="takeAction('scan_system')">🔍 Scan System</button>
-    <button onclick="takeAction('throttle_bandwidth')">🐢 Throttle BW</button>
-    <button class="danger" onclick="takeAction('isolate_subsystem')">⚡ Isolate Subsystem</button>
-</div>
+<button onclick="takeAction('do_nothing')">Do Nothing</button>
+<button onclick="takeAction('monitor_traffic')">Monitor Traffic</button>
+<button onclick="takeAction('block_ip')">Block IP</button>
+<button onclick="takeAction('scan_system')">Scan System</button>
+<button onclick="takeAction('throttle_bandwidth')">Throttle BW</button>
+<button class="danger" onclick="takeAction('isolate_subsystem')">Isolate Subsystem</button>
 <h2>Observations</h2>
 <div id="obs"></div>
 <pre id="output">Click a task above to start...</pre>
 <script>
-let sessionId = null;
-async function resetEnv(taskId) {
-    document.getElementById('output').textContent = 'Starting episode...';
-    const r = await fetch('/reset', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({task_id: taskId, seed: Math.floor(Math.random()*1000)})
-    });
-    const d = await r.json();
-    sessionId = d.session_id;
-    renderState(d);
+let sid=null;
+async function resetEnv(t){
+  document.getElementById('output').textContent='Starting...';
+  const r=await fetch('/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_id:t,seed:Math.floor(Math.random()*1000)})});
+  const d=await r.json();sid=d.session_id;render(d);
 }
-async function takeAction(action) {
-    if (!sessionId) { alert('Start an episode first!'); return; }
-    const r = await fetch('/step', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({session_id: sessionId, action: action, reasoning: 'Manual demo action'})
-    });
-    const d = await r.json();
-    renderState(d);
-    if (d.episode_complete) {
-        document.getElementById('output').textContent += '\\n\\n🏁 EPISODE COMPLETE\\nScore: ' + (d.grade?.score * 100).toFixed(1) + '%\\n' + JSON.stringify(d.grade, null, 2);
-    }
+async function takeAction(a){
+  if(!sid){alert('Start first!');return;}
+  const r=await fetch('/step',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sid,action:a,reasoning:'demo'})});
+  const d=await r.json();render(d);
+  if(d.episode_complete)document.getElementById('output').textContent+='\\n\\nEPISODE COMPLETE Score:'+(d.grade?.score*100).toFixed(1)+'%';
 }
-function renderState(d) {
-    const obs = d.observation || {};
-    document.getElementById('obs').innerHTML = Object.entries(obs).map(([k,v]) => `
-        <div class="obs-item"><b>${k.replace(/_/g,' ')}</b>: ${(v*100).toFixed(1)}%
-        <div class="bar"><div class="bar-fill" style="width:${v*100}%"></div></div></div>`).join('');
-    document.getElementById('output').textContent = `Session: ${d.session_id?.slice(0,8)}...
-Step: ${d.step || 0}
-Health: ${((d.system_health||0)*100).toFixed(1)}%
-Budget: ${((d.resource_budget||0)*100).toFixed(1)}%
-Reward: ${d.reward ?? '—'}   Total: ${d.total_reward ?? '—'}
-Done: ${d.done}
-
-${d.observation_text || ''}`;
+function render(d){
+  const obs=d.observation||{};
+  document.getElementById('obs').innerHTML=Object.entries(obs).map(([k,v])=>`<div class="obs-item"><b>${k.replace(/_/g,' ')}</b>: ${(v*100).toFixed(1)}%<div class="bar"><div class="bar-fill" style="width:${v*100}%"></div></div></div>`).join('');
+  document.getElementById('output').textContent=`Step:${d.step||0} Health:${((d.system_health||0)*100).toFixed(1)}% Budget:${((d.resource_budget||0)*100).toFixed(1)}% Reward:${d.reward??'-'}\\n\\n${d.observation_text||''}`;
 }
 </script>
-</body>
-</html>
-"""
-
-
-def main():
+</body></html>"""
     import uvicorn
     uvicorn.run(app, host=cfg.host, port=cfg.port, log_level=cfg.log_level)
 
 if __name__ == "__main__":
     main()
+   
