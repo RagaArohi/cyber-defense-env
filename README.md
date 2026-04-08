@@ -1,3 +1,11 @@
+---
+title: Cyber Defense Env
+emoji: 🛡️
+colorFrom: blue
+colorTo: red
+sdk: docker
+pinned: false
+---
 # 🛡️ Adaptive Cyber Defense Environment (ACD-Env)
 
 > An OpenEnv-compatible environment where an LLM agent acts as a cybersecurity analyst, detecting and stopping multi-stage cyber attacks under partial observability and resource constraints.
