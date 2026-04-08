@@ -316,7 +316,7 @@ def grade_episode(req: GradeRequest):
     result["steps_taken"] = sess["steps"]
     result["session_id"] = req.session_id
     return result
-python -c "lines=open('app.py').readlines(); [print(i+315, l.rstrip()) for i,l in enumerate(lines[314:])]"
+
 
 def main():
     import uvicorn
