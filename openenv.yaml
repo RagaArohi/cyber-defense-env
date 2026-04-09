@@ -1,91 +1,42 @@
+spec_version: 1
 name: cyber-defense-env
-version: 1.0.0
 description: >
-  A partially-observable reinforcement learning environment where an LLM agent
-  acts as a cybersecurity analyst, detecting and stopping multi-stage cyber attacks
-  using 6 discrete defense actions and 8 noisy sensor readings.
-
-author: "ACD-Env Team"
-license: MIT
-
-environment:
-  type: sequential
-  observation_space:
-    type: continuous
-    shape: [8]
-    features:
-      - network_traffic_anomaly
-      - failed_login_rate
-      - suspicious_process_score
-      - cpu_usage
-      - memory_usage
-      - alert_level
-      - bandwidth_usage
-      - time_step_norm
-  action_space:
-    type: discrete
-    actions:
-      - do_nothing
-      - monitor_traffic
-      - block_ip
-      - scan_system
-      - throttle_bandwidth
-      - isolate_subsystem
-  partial_observability: true
-  stochastic: true
+  Cyber defense RL environment where an agent monitors
+  network signals and responds to attacks across 3 tasks.
+author: RagaArohi
+version: "1.0.0"
+type: sequential
+runtime: docker
+app: server.app:app
+port: 7860
 
 tasks:
-  - id: detect_recon
-    name: "Detect Reconnaissance"
-    difficulty: easy
-    max_steps: 30
-    success_threshold: 0.70
-    grader: tasks.graders.grade_detect_recon
+  - task_id: detect_recon
+    name: Detect Reconnaissance
     description: >
-      Identify reconnaissance activity early and respond with monitoring or blocking
-      actions before the attack escalates. Keep system health above 0.70.
+      Agent monitors network signals and must detect
+      a port-scan/recon attack within 15 steps.
+    max_steps: 15
+    grader:
+      type: deterministic
+      endpoint: /grader
 
-  - id: stop_exploit
-    name: "Stop Active Exploitation"
-    difficulty: medium
-    max_steps: 40
-    success_threshold: 0.60
-    grader: tasks.graders.grade_stop_exploit
+  - task_id: stop_exploit
+    name: Stop Exploit Attempt
     description: >
-      Stop the active exploitation before the attacker reaches the persistence stage.
-      Use targeted actions and manage your resource budget carefully.
+      Agent must identify and block an active exploit
+      attempt before the attacker reaches stage 3.
+    max_steps: 20
+    grader:
+      type: deterministic
+      endpoint: /grader
 
-  - id: prevent_exfil
-    name: "Prevent Data Exfiltration"
-    difficulty: hard
-    max_steps: 50
-    success_threshold: 0.50
-    grader: tasks.graders.grade_prevent_exfil
+  - task_id: prevent_exfil
+    name: Prevent Data Exfiltration
     description: >
-      Prevent data exfiltration using the right actions at the right time.
-      Avoid false positives and maintain system availability.
-
-server:
-  framework: fastapi
-  entry_point: app:app
-  host: "0.0.0.0"
-  port: 7860
-
-inference:
-  entry_point: inference.py
-  # Hackathon-required environment variables:
-  api_base_url_env: API_BASE_URL          # has default
-  model_name_env:   MODEL_NAME            # has default
-  hf_token_env:     HF_TOKEN              # NO default — set in Space secrets
-  local_image_name_env: LOCAL_IMAGE_NAME  # optional
-  llm_client: openai                      # uses from openai import OpenAI
-  fallback: rule-based
-
-docker:
-  base_image: python:3.11-slim
-  port: 7860
-  env_vars:
-    - API_BASE_URL
-    - MODEL_NAME
-    - HF_TOKEN
-    - LOCAL_IMAGE_NAME
+      Agent must detect and stop data exfiltration
+      within a multi-stage APT kill chain.
+    max_steps: 25
+    grader:
+      type: deterministic
+      endpoint: /grader
