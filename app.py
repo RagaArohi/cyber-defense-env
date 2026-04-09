@@ -14,8 +14,7 @@ Endpoints:
 Deploy: uvicorn app:app --host 0.0.0.0 --port 7860
 """
 
-from fastapi import FastAPI, HTTPException, Body
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
@@ -99,6 +98,7 @@ TASK_CATALOG = {
         "has_grader": True,
     },
 }
+
 ACTION_DESCRIPTIONS = {
     "do_nothing":         "Take no action. Free, but allows attack to progress.",
     "monitor_traffic":    "Monitor network traffic. Cost 0.05. Reduces observation noise by 50%.",
@@ -227,9 +227,7 @@ def observation_space():
 
 
 @app.post("/reset")
-def reset(req: Optional[ResetRequest] = Body(default=None)):
-    if req is None:
-        req = ResetRequest()
+def reset(req: ResetRequest):
     task = TASK_CATALOG[req.task_id]
     env = CyberDefenseEnv(max_steps=task["max_steps"])
     obs_arr, info = env.reset(seed=req.seed)
@@ -321,12 +319,3 @@ def grade_episode(req: GradeRequest):
     result["steps_taken"] = sess["steps"]
     result["session_id"] = req.session_id
     return result
-
-
-def main():
-    import uvicorn
-    uvicorn.run(app, host=cfg.host, port=cfg.port, log_level=cfg.log_level)
-
-
-if __name__ == "__main__":
-    main()
