@@ -14,7 +14,7 @@ Endpoints:
 Deploy: uvicorn app:app --host 0.0.0.0 --port 7860
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
@@ -227,7 +227,9 @@ def observation_space():
 
 
 @app.post("/reset")
-def reset(req: ResetRequest):
+def reset(req: Optional[ResetRequest] = Body(default=None)):
+    if req is None:
+        req = ResetRequest()
     task = TASK_CATALOG[req.task_id]
     env = CyberDefenseEnv(max_steps=task["max_steps"])
     obs_arr, info = env.reset(seed=req.seed)
