@@ -4,9 +4,9 @@ inference.py — LLM Agent for CyberDefenseEnv
 OpenEnv Hackathon-compliant inference script.
 
 Environment variables (set in HuggingFace Space secrets or .env):
-  API_BASE_URL  — OpenAI-compatible API base URL  (has default)
-  MODEL_NAME    — Model to use                     (has default)
-  HF_TOKEN      — API token / HuggingFace token    (NO default — required)
+  API_BASE_URL  — OpenAI-compatible API base URL (has default)
+  MODEL_NAME    — Model to use (has default)
+  HF_TOKEN      — API token / HuggingFace token (NO default — required for LLM)
 
 Usage:
   python inference.py --all-tasks --standalone
@@ -14,8 +14,8 @@ Usage:
 
 Output format (OpenEnv spec):
   [START] task_id
-  [STEP]  step | action | reward | health | reasoning
-  [END]   score | reason
+  [STEP] step | action | reward | health | reasoning
+  [END] score | reason
 """
 
 import os
@@ -25,53 +25,34 @@ import argparse
 from openai import OpenAI
 
 # ── Hackathon-required environment variables ──────────────────────────────────
-# Defaults allowed for API_BASE_URL and MODEL_NAME — NOT for HF_TOKEN
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api-inference.huggingface.co/v1/")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN     = os.getenv("HF_TOKEN")
-
-# Optional — only needed if using from_docker_image()
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
 # ── System prompt ─────────────────────────────────────────────────────────────
-
 SYSTEM_PROMPT = """You are a senior cybersecurity analyst operating an automated network defense system.
 
 You receive 8 sensor readings every step and must choose one defense action.
-The attacker follows a kill chain you CANNOT see directly:
-  Stage 0 = Dormant   → Stage 1 = Recon → Stage 2 = Exploit → Stage 3 = Persist → Stage 4 = Exfil
 
-SENSOR READINGS FORMAT (example):
-  - Network traffic anomaly:    0.72  (0=normal, 1=severe)
-  - Failed login rate:          0.58
-  - Suspicious process score:   0.14
-  - CPU usage:                  0.43
-  - Memory usage:               0.39
-  - Alert level:                0.61
-  - Bandwidth usage:            0.21
-  - Episode progress:           0.20  (0=start, 1=end)
-  - System health:              0.88
-  - Resource budget remaining:  0.75
+The attacker follows a kill chain you CANNOT see directly:
+Stage 0 = Dormant → Stage 1 = Recon → Stage 2 = Exploit → Stage 3 = Persist → Stage 4 = Exfil
 
 AVAILABLE ACTIONS — choose exactly one:
-  do_nothing         Cost 0.00  No effect. Use only when all signals are truly low.
-  monitor_traffic    Cost 0.05  Halves sensor noise next step. Use when uncertain.
-  block_ip           Cost 0.10  Stop connections. Best vs Recon (stage 1) and Exploit (stage 2).
-  scan_system        Cost 0.20  Deep scan. Best vs Persistence (stage 3).
-  throttle_bandwidth Cost 0.10  Limit outbound data. Best vs Exfiltration (stage 4).
-  isolate_subsystem  Cost 0.30  Emergency full stop. Use when health < 0.40 OR all signals maxed.
+do_nothing         Cost 0.00  No effect. Use only when all signals are truly low.
+monitor_traffic    Cost 0.05  Halves sensor noise next step. Use when uncertain.
+block_ip           Cost 0.10  Stop connections. Best vs Recon (stage 1) and Exploit (stage 2).
+scan_system        Cost 0.20  Deep scan. Best vs Persistence (stage 3).
+throttle_bandwidth Cost 0.10  Limit outbound data. Best vs Exfiltration (stage 4).
+isolate_subsystem  Cost 0.30  Emergency full stop. Use when health < 0.40 OR all signals maxed.
 
-STAGE INFERENCE RULES — read these carefully:
-  • High network_traffic_anomaly + high failed_login_rate  → Stage 1 or 2  → block_ip
-  • High suspicious_process_score (> 0.55)                 → Stage 3       → scan_system
-  • High bandwidth_usage (> 0.60) + high alert_level       → Stage 4       → throttle_bandwidth
-  • High bandwidth_usage (> 0.70) regardless of alert      → Stage 4       → throttle_bandwidth
-  • System health < 0.40                                   → Emergency     → isolate_subsystem
-  • All signals < 0.25                                     → No threat     → do_nothing
-  • Signals mixed or unclear                               → monitor_traffic
-
-CRITICAL RULE: When bandwidth_usage > 0.60, ALWAYS use throttle_bandwidth or isolate_subsystem.
-Never use scan_system when bandwidth_usage is high — scan_system does nothing against exfiltration.
+STAGE INFERENCE RULES:
+• High network_traffic_anomaly + high failed_login_rate → Stage 1 or 2 → block_ip
+• High suspicious_process_score (> 0.55) → Stage 3 → scan_system
+• High bandwidth_usage (> 0.60) + high alert_level → Stage 4 → throttle_bandwidth
+• System health < 0.40 → Emergency → isolate_subsystem
+• All signals < 0.25 → No threat → do_nothing
+• Signals mixed or unclear → monitor_traffic
 
 Respond in EXACTLY this format with no other text:
 ACTION: <action_name>
@@ -81,26 +62,21 @@ TASK_PROMPTS = {
     "detect_recon": (
         "TASK GOAL: Detect reconnaissance early. "
         "At the first sign of elevated network_traffic_anomaly or failed_login_rate, "
-        "respond immediately with monitor_traffic or block_ip. "
-        "Do NOT wait for signals to peak — early response scores maximum points."
+        "respond immediately with monitor_traffic or block_ip."
     ),
     "stop_exploit": (
         "TASK GOAL: Stop active exploitation before it reaches persistence (stage 3). "
         "Use block_ip aggressively when login failures and traffic anomalies are high. "
-        "Escalate to scan_system if suspicious_process_score rises above 0.50. "
         "If bandwidth_usage exceeds 0.60, switch immediately to throttle_bandwidth."
     ),
     "prevent_exfil": (
         "TASK GOAL: Prevent data exfiltration at ALL costs. "
         "Watch bandwidth_usage every step — if it exceeds 0.55, use throttle_bandwidth NOW. "
-        "If it exceeds 0.70 or health drops below 0.40, use isolate_subsystem. "
-        "A score of 0.0 is given if exfiltration completes, so act early and decisively."
+        "If it exceeds 0.70 or health drops below 0.40, use isolate_subsystem."
     ),
 }
 
-
-# ── LLM call (OpenAI client — hackathon required) ─────────────────────────────
-
+# ── LLM call ──────────────────────────────────────────────────────────────────
 def call_llm(observation_text: str, history: list, task_id: str, step: int) -> tuple:
     """Returns (action_name, reasoning). Falls back to rule-based if HF_TOKEN not set."""
     task_context = TASK_PROMPTS.get(task_id, "")
@@ -110,19 +86,14 @@ def call_llm(observation_text: str, history: list, task_id: str, step: int) -> t
         f"Step {step} sensor readings:\n{observation_text}\n\n"
         "Choose your action:"
     )
-
     if HF_TOKEN:
         return _call_openai_client(user_message, history)
     return _rule_based_fallback(observation_text)
 
 
 def _call_openai_client(user_message: str, history: list) -> tuple:
-    """All LLM calls use the OpenAI client configured via API_BASE_URL + HF_TOKEN."""
     try:
-        client = OpenAI(
-            base_url=API_BASE_URL,
-            api_key=HF_TOKEN,
-        )
+        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
         resp = client.chat.completions.create(
             model=MODEL_NAME,
             max_tokens=150,
@@ -135,17 +106,15 @@ def _call_openai_client(user_message: str, history: list) -> tuple:
         raw = resp.choices[0].message.content
         return _parse_response(raw)
     except Exception as e:
-        print(f"  [LLM error] {e} — using rule-based fallback")
+        print(f"[LLM error] {e} — using rule-based fallback", file=sys.stderr)
         return _rule_based_fallback(user_message)
 
 
 def _parse_response(raw: str) -> tuple:
-    """Parse ACTION: / REASONING: from LLM output. Fuzzy-matches partial names."""
     valid = ["do_nothing", "monitor_traffic", "block_ip", "scan_system",
              "throttle_bandwidth", "isolate_subsystem"]
     action = "do_nothing"
     reasoning = "No reasoning provided"
-
     for line in raw.strip().splitlines():
         upper = line.upper()
         if upper.startswith("ACTION:"):
@@ -159,15 +128,11 @@ def _parse_response(raw: str) -> tuple:
                         break
         elif upper.startswith("REASONING:"):
             reasoning = line.split(":", 1)[1].strip()
-
     return action, reasoning
 
 
 def _rule_based_fallback(obs_text: str) -> tuple:
-    """
-    Deterministic rule-based agent — no LLM required.
-    Used when HF_TOKEN is not set.
-    """
+    """Deterministic rule-based agent — no LLM required."""
     def extract(keyword: str) -> float:
         kw = keyword.lower()
         for line in obs_text.splitlines():
@@ -202,7 +167,6 @@ def _rule_based_fallback(obs_text: str) -> tuple:
 
 
 # ── Standalone runner ─────────────────────────────────────────────────────────
-
 def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict:
     """Run one full episode using the Python env directly (no server needed)."""
     from env.cyber_env import CyberDefenseEnv
@@ -216,10 +180,8 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
     total_reward = 0.0
     history = []
 
-    if verbose:
-        print(f"\n{'='*60}")
-        print(f"  [START] {task_id}  (seed={seed})")
-        print(f"{'='*60}")
+    # Required output: [START] task_id
+    print(f"[START] {task_id}")
 
     while not env.done:
         step = info["step"]
@@ -227,15 +189,16 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
         obs_text = env.obs_to_text(obs_dict)
 
         action, reasoning = call_llm(obs_text, history, task_id, step + 1)
+
         obs_arr, reward, terminated, truncated, info = env.step(action)
         total_reward += reward
 
         log_entry = {
-            "step":          info["step"],
-            "action":        action,
-            "reasoning":     reasoning,
-            "reward":        round(reward, 4),
-            "info":          info,
+            "step": info["step"],
+            "action": action,
+            "reasoning": reasoning,
+            "reward": round(reward, 4),
+            "info": info,
             "false_positive": info.get("false_positive", False),
         }
         episode_log.append(log_entry)
@@ -245,19 +208,13 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
         if len(history) > 12:
             history = history[-12:]
 
-        if verbose:
-            print(
-                f"  [STEP] {info['step']:2d} | {action:22s} | "
-                f"reward={reward:+6.2f} | health={info['system_health']:.2f} | "
-                f"{reasoning[:52]}"
-            )
+        # Required output: [STEP] step | action | reward | health | reasoning
+        print(f"[STEP] {info['step']} | {action} | {round(reward, 4)} | {info['system_health']:.4f} | {reasoning}")
 
     grade_result = grade(task_id, episode_log)
 
-    if verbose:
-        print(f"\n  [END] score={grade_result['score']:.3f} | {grade_result['reason']}")
-        print(f"  Total reward: {total_reward:+.2f} | Steps: {len(episode_log)}")
-        print(f"{'='*60}\n")
+    # Required output: [END] score | reason
+    print(f"[END] {grade_result['score']:.4f} | {grade_result['reason']}")
 
     return {
         "task_id":      task_id,
@@ -270,14 +227,13 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
 
 
 # ── HTTP runner ───────────────────────────────────────────────────────────────
-
 def run_http(task_id: str, server_url: str, seed: int = None, verbose: bool = True) -> dict:
     """Run one episode via HTTP against the FastAPI server."""
     import urllib.request
 
     def post(path: str, body: dict) -> dict:
         data = json.dumps(body).encode()
-        req = urllib.request.Request(
+        req  = urllib.request.Request(
             f"{server_url}{path}",
             data=data,
             headers={"Content-Type": "application/json"},
@@ -286,72 +242,54 @@ def run_http(task_id: str, server_url: str, seed: int = None, verbose: bool = Tr
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read())
 
-    resp = post("/reset", {"task_id": task_id, "seed": seed})
+    resp       = post("/reset", {"task_id": task_id, "seed": seed})
     session_id = resp["session_id"]
     history, total_reward, steps = [], 0.0, 0
 
-    if verbose:
-        print(f"\n{'='*60}")
-        print(f"  [START] {task_id}  (session={session_id[:8]}...)")
-        print(f"{'='*60}")
+    print(f"[START] {task_id}")
 
     while not resp.get("done", False) and not resp.get("episode_complete", False):
-        obs_text = resp["observation_text"]
+        obs_text        = resp["observation_text"]
         action, reasoning = call_llm(obs_text, history, task_id, steps + 1)
-
-        resp = post("/step", {"session_id": session_id, "action": action, "reasoning": reasoning})
-        steps += 1
-        reward = resp.get("reward", 0.0)
-        total_reward += reward
-        health = resp.get("system_health", 0.0)
+        resp            = post("/step", {"session_id": session_id, "action": action, "reasoning": reasoning})
+        steps          += 1
+        reward          = resp.get("reward", 0.0)
+        total_reward   += reward
+        health          = resp.get("system_health", 0.0)
 
         history.append({"role": "user",      "content": f"Step {steps}:\n{obs_text}"})
         history.append({"role": "assistant", "content": f"ACTION: {action}\nREASONING: {reasoning}"})
         if len(history) > 12:
             history = history[-12:]
 
-        if verbose:
-            print(
-                f"  [STEP] {steps:2d} | {action:22s} | "
-                f"reward={reward:+6.2f} | health={health:.2f} | {reasoning[:52]}"
-            )
+        print(f"[STEP] {steps} | {action} | {round(reward, 4)} | {health:.4f} | {reasoning}")
 
         if resp.get("episode_complete"):
             break
 
     grade_result = resp.get("grade", {})
-    if verbose:
-        print(f"\n  [END] score={grade_result.get('score', 0):.3f} | {grade_result.get('reason', '')}")
-        print(f"{'='*60}\n")
+    score  = grade_result.get("score", 0)
+    reason = grade_result.get("reason", "episode complete")
+    print(f"[END] {score:.4f} | {reason}")
 
-    return {"task_id": task_id, "score": grade_result.get("score", 0), "steps": steps}
+    return {"task_id": task_id, "score": score, "steps": steps}
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
-
 def main():
-    # Print active config at startup
-    print("\n" + "─"*60)
-    print("  ACD-Env — Adaptive Cyber Defense Environment")
-    print("─"*60)
-    print(f"  API_BASE_URL : {API_BASE_URL}")
-    print(f"  MODEL_NAME   : {MODEL_NAME}")
-    print(f"  HF_TOKEN     : {'SET (' + HF_TOKEN[:8] + '...)' if HF_TOKEN else 'NOT SET — using rule-based fallback'}")
-    print("─"*60 + "\n")
-
     parser = argparse.ArgumentParser(description="ACD-Env LLM Agent Runner")
     parser.add_argument("--task", default="stop_exploit",
                         choices=["detect_recon", "stop_exploit", "prevent_exfil"])
-    parser.add_argument("--all-tasks", action="store_true", help="Run all three tasks")
+    parser.add_argument("--all-tasks",  action="store_true", help="Run all three tasks")
     parser.add_argument("--standalone", action="store_true",
                         help="Run directly without HTTP server (default if no --server)")
-    parser.add_argument("--server", default=None,
+    parser.add_argument("--server",     default=None,
                         help="Server URL e.g. http://localhost:7860")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--seed",       type=int, default=42)
+    parser.add_argument("--quiet",      action="store_true")
     args = parser.parse_args()
 
-    tasks = ["detect_recon", "stop_exploit", "prevent_exfil"] if args.all_tasks else [args.task]
+    tasks   = ["detect_recon", "stop_exploit", "prevent_exfil"] if args.all_tasks else [args.task]
     results = []
 
     for task in tasks:
@@ -362,15 +300,8 @@ def main():
         results.append(r)
 
     if len(results) > 1:
-        print("\n" + "="*60)
-        print("  FINAL SUMMARY")
-        print("="*60)
-        for r in results:
-            bar = "█" * int(r["score"] * 20)
-            print(f"  {r['task_id']:20s}  {bar:<20s}  {r['score']:.3f}")
         avg = sum(r["score"] for r in results) / len(results)
-        print(f"\n  Average score: {avg:.3f}")
-        print("="*60 + "\n")
+        print(f"\nAverage score: {avg:.4f}")
 
 
 if __name__ == "__main__":
