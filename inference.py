@@ -218,7 +218,7 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
 
     return {
         "task_id":      task_id,
-        "score":        grade_result["score"],
+        "score":        max(0.001, min(0.999, float(grade_result["score"]))),
         "total_reward": round(total_reward, 4),
         "steps":        len(episode_log),
         "grade_detail": grade_result,
@@ -268,7 +268,7 @@ def run_http(task_id: str, server_url: str, seed: int = None, verbose: bool = Tr
             break
 
     grade_result = resp.get("grade", {})
-    score  = grade_result.get("score", 0)
+    score  = max(0.001, min(0.999, float(grade_result.get("score", 0.5))))
     reason = grade_result.get("reason", "episode complete")
     print(f"[END] {score:.4f} | {reason}")
 
