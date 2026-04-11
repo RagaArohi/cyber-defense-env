@@ -23,7 +23,7 @@ def grade_detect_recon(episode_log: List[dict]) -> dict:
     Partial credit for late detection or moderate health loss.
     """
     if not episode_log:
-        return {"score": 0.0, "reason": "Empty episode log"}
+        return {"score": 0.001, "reason": "Empty episode log"}
 
     recon_step = None
     response_step = None
@@ -64,6 +64,7 @@ def grade_detect_recon(episode_log: List[dict]) -> dict:
     stop_bonus = 0.2 if attack_stopped else 0.0
     score = min(1.0, detection_score * 0.6 + health_score * 0.4 + stop_bonus)
 
+    score = max(0.001, min(0.999, score))
     return {
         "score": round(score, 4),
         "reason": f"Recon at step {recon_step}, response at step {response_step} (delay={response_delay}), health={final_health:.2f}",
@@ -84,7 +85,7 @@ def grade_stop_exploit(episode_log: List[dict]) -> dict:
     Partial credit for late stops or high resource use.
     """
     if not episode_log:
-        return {"score": 0.0, "reason": "Empty episode log"}
+        return {"score": 0.001, "reason": "Empty episode log"}
 
     final = episode_log[-1]
     final_health = final["info"].get("system_health", 0.0)
@@ -130,6 +131,7 @@ def grade_stop_exploit(episode_log: List[dict]) -> dict:
 
     score = min(1.0, stage_score * 0.5 + health_score * 0.3 + efficiency_score * 0.2)
 
+    score = max(0.001, min(0.999, score))
     return {
         "score": round(score, 4),
         "reason": f"Stopped at stage {stop_stage}, health={final_health:.2f}, cost={total_cost:.2f}",
@@ -152,7 +154,7 @@ def grade_prevent_exfil(episode_log: List[dict]) -> dict:
     This requires the agent to correctly read late-stage signals.
     """
     if not episode_log:
-        return {"score": 0.0, "reason": "Empty episode log"}
+        return {"score": 0.001, "reason": "Empty episode log"}
 
     final = episode_log[-1]
     exfil_complete = final["info"].get("exfil_complete", False)
@@ -176,7 +178,7 @@ def grade_prevent_exfil(episode_log: List[dict]) -> dict:
 
     if exfil_complete:
         return {
-            "score": 0.0,
+            "score": 0.001,
             "reason": "Exfiltration completed — data stolen",
         }
 
@@ -197,6 +199,7 @@ def grade_prevent_exfil(episode_log: List[dict]) -> dict:
     score = min(1.0, health_score * 0.45 + action_quality * 0.35 + stop_bonus - fp_penalty)
     score = max(0.0, score)
 
+    score = max(0.001, min(0.999, score))
     return {
         "score": round(score, 4),
         "reason": (
@@ -220,5 +223,5 @@ def grade(task_id: str, episode_log: List[dict]) -> dict:
     """Dispatch to the correct grader."""
     grader = GRADERS.get(task_id)
     if grader is None:
-        return {"score": 0.0, "reason": f"Unknown task: {task_id}"}
+        return {"score": 0.001, "reason": f"Unknown task: {task_id}"}
     return grader(episode_log)
