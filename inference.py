@@ -212,13 +212,15 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
         print(f"[STEP] {info['step']} | {action} | {round(reward, 4)} | {info['system_health']:.4f} | {reasoning}")
 
     grade_result = grade(task_id, episode_log)
+    _safe = max(0.01, min(0.99, float(grade_result.get("score", 0.5))))
+    grade_result["score"] = _safe
 
     # Required output: [END] score | reason
-    print(f"[END] {grade_result['score']:.4f} | {grade_result['reason']}")
+    print(f"[END] {_safe:.4f} | {grade_result['reason']}")
 
     return {
         "task_id":      task_id,
-        "score":        max(0.001, min(0.999, float(grade_result["score"]))),
+        "score":        _safe,
         "total_reward": round(total_reward, 4),
         "steps":        len(episode_log),
         "grade_detail": grade_result,
