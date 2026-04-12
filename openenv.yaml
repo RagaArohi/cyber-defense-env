@@ -9,7 +9,6 @@ type: sequential
 runtime: docker
 app: server.app:app
 port: 7860
-
 tasks:
   - task_id: detect_recon
     name: Detect Reconnaissance
@@ -20,7 +19,6 @@ tasks:
     grader:
       type: deterministic
       endpoint: /grader
-
   - task_id: stop_exploit
     name: Stop Exploit Attempt
     description: >
@@ -30,7 +28,6 @@ tasks:
     grader:
       type: deterministic
       endpoint: /grader
-
   - task_id: prevent_exfil
     name: Prevent Data Exfiltration
     description: >
