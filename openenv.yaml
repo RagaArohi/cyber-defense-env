@@ -12,28 +12,19 @@ port: 7860
 tasks:
   - task_id: detect_recon
     name: Detect Reconnaissance
-    description: >
-      Agent monitors network signals and must detect
-      a port-scan/recon attack within 15 steps.
-    max_steps: 15
+    max_steps: 30
     grader:
       type: deterministic
       endpoint: /grader
   - task_id: stop_exploit
-    name: Stop Exploit Attempt
-    description: >
-      Agent must identify and block an active exploit
-      attempt before the attacker reaches stage 3.
-    max_steps: 20
+    name: Stop Active Exploitation
+    max_steps: 40
     grader:
       type: deterministic
       endpoint: /grader
   - task_id: prevent_exfil
     name: Prevent Data Exfiltration
-    description: >
-      Agent must detect and stop data exfiltration
-      within a multi-stage APT kill chain.
-    max_steps: 25
+    max_steps: 50
     grader:
       type: deterministic
       endpoint: /grader
