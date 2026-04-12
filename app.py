@@ -321,3 +321,6 @@ def grade_episode(req: GradeRequest):
     result["steps_taken"] = sess["steps"]
     result["session_id"] = req.session_id
     return result
+@app.post("/grader")
+def grader_endpoint(req: GradeRequest):
+    return grade_episode(req)
