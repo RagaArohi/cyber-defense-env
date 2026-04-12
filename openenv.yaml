@@ -1,26 +1,22 @@
 spec_version: 1
 name: cyber-defense-env
-description: >
-  Cyber defense RL environment where an agent monitors
-  network signals and responds to attacks across 3 tasks.
+description: Cyber defense RL environment
 author: RagaArohi
 version: "1.0.0"
 type: sequential
 runtime: docker
 app: app:app
 port: 7860
-  tasks:
+tasks:
   - id: detect_recon
     name: Detect Reconnaissance
     max_steps: 30
-    grader: tasks.graders:grade_detect_recon
-
+    grader: tasks.graders:GradeDetectRecon
   - id: stop_exploit
     name: Stop Active Exploitation
     max_steps: 40
-    grader: tasks.graders:grade_stop_exploit
-
+    grader: tasks.graders:GradeStopExploit
   - id: prevent_exfil
     name: Prevent Data Exfiltration
     max_steps: 50
-    grader: tasks.graders:grade_prevent_exfil
+    grader: tasks.graders:GradePreventExfil
