@@ -10,13 +10,19 @@ port: 7860
 tasks:
   - id: detect_recon
     name: Detect Reconnaissance
+    difficulty: easy
     max_steps: 30
     grader: tasks.graders:GradeDetectRecon
+    score_range: [0.01, 0.99]
   - id: stop_exploit
     name: Stop Active Exploitation
+    difficulty: medium
     max_steps: 40
     grader: tasks.graders:GradeStopExploit
+    score_range: [0.01, 0.99]
   - id: prevent_exfil
     name: Prevent Data Exfiltration
+    difficulty: hard
     max_steps: 50
     grader: tasks.graders:GradePreventExfil
+    score_range: [0.01, 0.99]
