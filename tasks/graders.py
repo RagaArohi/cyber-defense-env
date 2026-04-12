@@ -98,3 +98,19 @@ def grade(task_id, episode_log):
     result = grader(episode_log)
     result["score"] = _clamp(result["score"])
     return result
+# ── Grader classes for direct import by OpenEnv validator ────────────────────
+
+class GradeDetectRecon:
+    def grade(self, episode_log):
+        result = grade_detect_recon(episode_log or [])
+        return _clamp(result["score"])
+
+class GradeStopExploit:
+    def grade(self, episode_log):
+        result = grade_stop_exploit(episode_log or [])
+        return _clamp(result["score"])
+
+class GradePreventExfil:
+    def grade(self, episode_log):
+        result = grade_prevent_exfil(episode_log or [])
+        return _clamp(result["score"])
