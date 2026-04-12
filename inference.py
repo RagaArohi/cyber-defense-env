@@ -215,8 +215,8 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
     _safe = max(0.01, min(0.99, float(grade_result.get("score", 0.5))))
     grade_result["score"] = _safe
 
-    # Required output: [END] score | reason
-    print(f"[END] {_safe:.4f} | {grade_result['reason']}")
+    # Required output: [END] task_id | score | grader | reason
+    print(f"[END] {task_id} | score={_safe:.4f} | grader=grade_{task_id} | {grade_result['reason']}")
 
     return {
         "task_id":      task_id,
@@ -272,7 +272,7 @@ def run_http(task_id: str, server_url: str, seed: int = None, verbose: bool = Tr
     grade_result = resp.get("grade", {})
     score  = max(0.001, min(0.999, float(grade_result.get("score", 0.5))))
     reason = grade_result.get("reason", "episode complete")
-    print(f"[END] {score:.4f} | {reason}")
+    print(f"[END] {task_id} | score={score:.4f} | grader=grade_{task_id} | {reason}")
 
     return {"task_id": task_id, "score": score, "steps": steps}
 
