@@ -102,6 +102,8 @@ def grade(task_id, episode_log):
 
 class GradeDetectRecon:
     def grade(self, episode_log):
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         result = grade_detect_recon(episode_log or [])
         return _clamp(result["score"])
 
