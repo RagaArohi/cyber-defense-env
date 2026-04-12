@@ -4,18 +4,15 @@ inference.py — LLM Agent for CyberDefenseEnv
 OpenEnv Hackathon-compliant inference script.
 
 Environment variables (set in HuggingFace Space secrets or .env):
-  API_BASE_URL  — OpenAI-compatible API base URL (has default)
-  MODEL_NAME    — Model to use (has default)
-  HF_TOKEN      — API token / HuggingFace token (NO default — required for LLM)
-
-Usage:
-  python inference.py --all-tasks --standalone
-  python inference.py --all-tasks --server http://localhost:7860
+  API_BASE_URL     — OpenAI-compatible API base URL (has default)
+  MODEL_NAME       — Model to use (has default)
+  HF_TOKEN         — API token / HuggingFace token (NO default — required for LLM)
+  LOCAL_IMAGE_NAME — Optional, for from_docker_image()
 
 Output format (OpenEnv spec):
-  [START] task_id
-  [STEP] step | action | reward | health | reasoning
-  [END] score | reason
+  [START] task=<task_id> env=cyber-defense-env model=<model>
+  [STEP]  step=<n> action=<action> reward=<0.00> done=<true|false> error=<msg|null>
+  [END]   success=<true|false> steps=<n> score=<0.00> rewards=<r1,r2,...>
 """
 
 import os
@@ -25,10 +22,13 @@ import argparse
 from openai import OpenAI
 
 # ── Hackathon-required environment variables ──────────────────────────────────
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api-inference.huggingface.co/v1/")
-MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN     = os.getenv("HF_TOKEN")
+API_BASE_URL     = os.getenv("API_BASE_URL", "https://api-inference.huggingface.co/v1/")
+MODEL_NAME       = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN         = os.getenv("HF_TOKEN")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+
+ENV_NAME = "cyber-defense-env"
+SUCCESS_THRESHOLD = 0.5
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """You are a senior cybersecurity analyst operating an automated network defense system.
@@ -76,9 +76,26 @@ TASK_PROMPTS = {
     ),
 }
 
+# ── Logging helpers (exact OpenEnv spec) ─────────────────────────────────────
+
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error=None) -> None:
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
+
+
+def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
+
+
 # ── LLM call ──────────────────────────────────────────────────────────────────
+
 def call_llm(observation_text: str, history: list, task_id: str, step: int) -> tuple:
-    """Returns (action_name, reasoning). Falls back to rule-based if HF_TOKEN not set."""
     task_context = TASK_PROMPTS.get(task_id, "")
     user_message = (
         f"TASK: {task_id}\n"
@@ -106,7 +123,7 @@ def _call_openai_client(user_message: str, history: list) -> tuple:
         raw = resp.choices[0].message.content
         return _parse_response(raw)
     except Exception as e:
-        print(f"[LLM error] {e} — using rule-based fallback", file=sys.stderr)
+        print(f"[DEBUG] LLM error: {e}", file=sys.stderr, flush=True)
         return _rule_based_fallback(user_message)
 
 
@@ -132,7 +149,6 @@ def _parse_response(raw: str) -> tuple:
 
 
 def _rule_based_fallback(obs_text: str) -> tuple:
-    """Deterministic rule-based agent — no LLM required."""
     def extract(keyword: str) -> float:
         kw = keyword.lower()
         for line in obs_text.splitlines():
@@ -167,8 +183,8 @@ def _rule_based_fallback(obs_text: str) -> tuple:
 
 
 # ── Standalone runner ─────────────────────────────────────────────────────────
+
 def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict:
-    """Run one full episode using the Python env directly (no server needed)."""
     from env.cyber_env import CyberDefenseEnv
     from tasks.graders import grade
 
@@ -177,11 +193,11 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
     obs_arr, info = env.reset(seed=seed)
 
     episode_log = []
+    rewards = []
     total_reward = 0.0
     history = []
 
-    # Required output: [START] task_id
-    print(f"[START] {task_id}")
+    log_start(task=task_id, env=ENV_NAME, model=MODEL_NAME)
 
     while not env.done:
         step = info["step"]
@@ -192,6 +208,7 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
 
         obs_arr, reward, terminated, truncated, info = env.step(action)
         total_reward += reward
+        rewards.append(reward)
 
         log_entry = {
             "step": info["step"],
@@ -208,19 +225,18 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
         if len(history) > 12:
             history = history[-12:]
 
-        # Required output: [STEP] step | action | reward | health | reasoning
-        print(f"[STEP] {info['step']} | {action} | {round(reward, 4)} | {info['system_health']:.4f} | {reasoning}")
+        log_step(step=info["step"], action=action, reward=reward, done=env.done)
 
     grade_result = grade(task_id, episode_log)
-    _safe = max(0.01, min(0.99, float(grade_result.get("score", 0.5))))
-    grade_result["score"] = _safe
+    score = max(0.01, min(0.99, float(grade_result.get("score", 0.5))))
+    success = score >= SUCCESS_THRESHOLD
 
-    # Required output: [END] task_id | score | grader | reason
-    print(f"[END] {task_id} | score={_safe:.4f} | grader=grade_{task_id} | {grade_result['reason']}")
+    log_end(success=success, steps=len(episode_log), score=score, rewards=rewards)
 
     return {
         "task_id":      task_id,
-        "score":        _safe,
+        "score":        score,
+        "success":      success,
         "total_reward": round(total_reward, 4),
         "steps":        len(episode_log),
         "grade_detail": grade_result,
@@ -229,8 +245,8 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
 
 
 # ── HTTP runner ───────────────────────────────────────────────────────────────
+
 def run_http(task_id: str, server_url: str, seed: int = None, verbose: bool = True) -> dict:
-    """Run one episode via HTTP against the FastAPI server."""
     import urllib.request
 
     def post(path: str, body: dict) -> dict:
@@ -247,37 +263,41 @@ def run_http(task_id: str, server_url: str, seed: int = None, verbose: bool = Tr
     resp       = post("/reset", {"task_id": task_id, "seed": seed})
     session_id = resp["session_id"]
     history, total_reward, steps = [], 0.0, 0
+    rewards = []
 
-    print(f"[START] {task_id}")
+    log_start(task=task_id, env=ENV_NAME, model=MODEL_NAME)
 
     while not resp.get("done", False) and not resp.get("episode_complete", False):
-        obs_text        = resp["observation_text"]
+        obs_text          = resp["observation_text"]
         action, reasoning = call_llm(obs_text, history, task_id, steps + 1)
-        resp            = post("/step", {"session_id": session_id, "action": action, "reasoning": reasoning})
-        steps          += 1
-        reward          = resp.get("reward", 0.0)
-        total_reward   += reward
-        health          = resp.get("system_health", 0.0)
+        resp              = post("/step", {"session_id": session_id, "action": action, "reasoning": reasoning})
+        steps            += 1
+        reward            = resp.get("reward", 0.0)
+        total_reward     += reward
+        rewards.append(reward)
+        done              = resp.get("done", False) or resp.get("episode_complete", False)
 
         history.append({"role": "user",      "content": f"Step {steps}:\n{obs_text}"})
         history.append({"role": "assistant", "content": f"ACTION: {action}\nREASONING: {reasoning}"})
         if len(history) > 12:
             history = history[-12:]
 
-        print(f"[STEP] {steps} | {action} | {round(reward, 4)} | {health:.4f} | {reasoning}")
+        log_step(step=steps, action=action, reward=reward, done=done)
 
         if resp.get("episode_complete"):
             break
 
     grade_result = resp.get("grade", {})
-    score  = max(0.001, min(0.999, float(grade_result.get("score", 0.5))))
-    reason = grade_result.get("reason", "episode complete")
-    print(f"[END] {task_id} | score={score:.4f} | grader=grade_{task_id} | {reason}")
+    score   = max(0.01, min(0.99, float(grade_result.get("score", 0.5))))
+    success = score >= SUCCESS_THRESHOLD
+
+    log_end(success=success, steps=steps, score=score, rewards=rewards)
 
     return {"task_id": task_id, "score": score, "steps": steps}
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
+
 def main():
     parser = argparse.ArgumentParser(description="ACD-Env LLM Agent Runner")
     parser.add_argument("--task", default="stop_exploit",
