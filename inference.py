@@ -88,7 +88,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error=None) -> N
     print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
 
 
-def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
+def log_end(success: bool, steps: int, score: float, rewards: list, task: str = "") -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
     print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str} -> Avg score '{task}': {score:.4f}", flush=True)
 
