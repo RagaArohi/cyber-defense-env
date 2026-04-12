@@ -66,7 +66,7 @@ TASK_CATALOG = {
         ),
         "max_steps": 30,
         "success_threshold": 0.7,
-        "grader": "tasks.graders.grade_detect_recon",
+        "grader": "grade_detect_recon",
         "has_grader": True,
     },
     "stop_exploit": {
@@ -80,7 +80,7 @@ TASK_CATALOG = {
         ),
         "max_steps": 40,
         "success_threshold": 0.6,
-        "grader": "tasks.graders.grade_stop_exploit",
+        "grader": "grade_stop_exploit",
         "has_grader": True,
     },
     "prevent_exfil": {
@@ -94,7 +94,7 @@ TASK_CATALOG = {
         ),
         "max_steps": 50,
         "success_threshold": 0.5,
-        "grader": "tasks.graders.grade_prevent_exfil",
+        "grader": "grade_prevent_exfil",
         "has_grader": True,
     },
 }
