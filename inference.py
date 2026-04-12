@@ -90,7 +90,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error=None) -> N
 
 def log_end(success: bool, steps: int, score: float, rewards: list, task: str = "") -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str} -> Avg score '{task}': {score:.4f}", flush=True)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
 
 
 # ── LLM call ──────────────────────────────────────────────────────────────────
@@ -231,7 +231,7 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
     score = max(0.01, min(0.99, float(grade_result.get("score", 0.5))))
     success = score >= SUCCESS_THRESHOLD
 
-    log_end(success=success, steps=len(episode_log), score=score, rewards=rewards, task=task_id)
+    log_end(success=success, steps=len(episode_log), score=score, rewards=rewards)
 
     return {
         "task_id":      task_id,
@@ -320,10 +320,6 @@ def main():
         else:
             r = run_standalone(task, seed=args.seed, verbose=not args.quiet)
         results.append(r)
-
-    if len(results) > 1:
-        avg = sum(r["score"] for r in results) / len(results)
-        print(f"\nAverage score: {avg:.4f}")
 
 
 if __name__ == "__main__":
