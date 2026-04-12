@@ -88,9 +88,9 @@ def log_step(step: int, action: str, reward: float, done: bool, error=None) -> N
     print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
 
 
-def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
+def log_end(success: bool, steps: int, score: float, rewards: list, task: str = "") -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
+    print(f"[END] task={task} success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
 
 # ── LLM call ──────────────────────────────────────────────────────────────────
@@ -231,7 +231,7 @@ def run_standalone(task_id: str, seed: int = None, verbose: bool = True) -> dict
     score = max(0.01, min(0.99, float(grade_result.get("score", 0.5))))
     success = score >= SUCCESS_THRESHOLD
 
-    log_end(success=success, steps=len(episode_log), score=score, rewards=rewards)
+    log_end(success=success, steps=len(episode_log), score=score, rewards=rewards, task=task_id)
 
     return {
         "task_id":      task_id,
@@ -291,7 +291,7 @@ def run_http(task_id: str, server_url: str, seed: int = None, verbose: bool = Tr
     score   = max(0.01, min(0.99, float(grade_result.get("score", 0.5))))
     success = score >= SUCCESS_THRESHOLD
 
-    log_end(success=success, steps=steps, score=score, rewards=rewards)
+    log_end(success=success, steps=steps, score=score, rewards=rewards, task=task_id)
 
     return {"task_id": task_id, "score": score, "steps": steps}
 
