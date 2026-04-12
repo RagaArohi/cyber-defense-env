@@ -7,7 +7,7 @@ author: RagaArohi
 version: "1.0.0"
 type: sequential
 runtime: docker
-app: server.app:app
+app: app:app
 port: 7860
 tasks:
   - task_id: detect_recon
