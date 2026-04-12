@@ -99,7 +99,6 @@ def grade(task_id, episode_log):
     result["score"] = _clamp(result["score"])
     return result
 # ── Grader classes for direct import by OpenEnv validator ────────────────────
-
 class GradeDetectRecon:
     def grade(self, episode_log):
         import sys, os
